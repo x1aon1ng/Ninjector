@@ -138,6 +138,10 @@ Ninjector --spawn-symbi -p com.demo.target /data/local/tmp/libtarget.so
 - `jni/Android.mk` 中引用了外部静态库 `libdobby.a`，请确保相关依赖路径存在且可用
 - 仓库当前只提交源码与必要文件，构建产物目录已在 `.gitignore` 中忽略
 
+## 参考项目
+https://github.com/Mrack/TInjector
+https://github.com/frida/frida-core/blob/8c62357b94908f46fbcdae76942c3ef1c1989160/src/linux/helpers/zymbiote.c
+
 ## 免责声明
 
 本项目仅用于 Android Native 技术研究、逆向分析学习与安全测试。请仅在合法授权的设备、进程和场景中使用，因不当使用造成的任何后果由使用者自行承担。
