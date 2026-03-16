@@ -1,0 +1,10 @@
+libs/
+obj/
+jni/libs/
+jni/obj/
+
+*.o
+*.d
+
+.DS_Store
+Thumbs.db
