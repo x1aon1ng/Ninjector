@@ -16,6 +16,7 @@ static char* g_target_so = nullptr;
 static void* g_android_os_Process_setArg = nullptr;
 static void* g_selinux_android_setcontext = nullptr;
 static bool g_payload_loaded = false;
+static bool g_spawn_hooks_installed = false;
 
 static void send_status_to_injector(const char* package_name, const char* so_path) {
     char payload[512] = {0};
@@ -57,15 +58,36 @@ static bool matches_target(const char* name) {
     return matched;
 }
 
+static void unload_target_state() {
+    if (g_target_package != nullptr) {
+        free(g_target_package);
+        g_target_package = nullptr;
+    }
+    if (g_target_so != nullptr) {
+        free(g_target_so);
+        g_target_so = nullptr;
+    }
+    g_payload_loaded = false;
+}
+
 static void unhook_all() {
     DobbyDestroy(reinterpret_cast<void*>(fork));
     DobbyDestroy(reinterpret_cast<void*>(vfork));
     if (g_android_os_Process_setArg != nullptr) {
         DobbyDestroy(g_android_os_Process_setArg);
+        g_android_os_Process_setArg = nullptr;
     }
     if (g_selinux_android_setcontext != nullptr) {
         DobbyDestroy(g_selinux_android_setcontext);
+        g_selinux_android_setcontext = nullptr;
     }
+    g_spawn_hooks_installed = false;
+}
+
+extern "C" void aclear() {
+    LOGI("ncore: aclear");
+    unhook_all();
+    unload_target_state();
 }
 
 static bool load_payload_if_needed(const char* package_name) {
@@ -154,14 +176,7 @@ DECLARE_HOOK(vfork, pid_t, void) {
 }
 
 extern "C" void ainject(const char* package_name, const char* so_path) {
-    if (g_target_package != nullptr) {
-        free(g_target_package);
-        g_target_package = nullptr;
-    }
-    if (g_target_so != nullptr) {
-        free(g_target_so);
-        g_target_so = nullptr;
-    }
+    unload_target_state();
 
     if (package_name != nullptr && package_name[0] != '\0') {
         g_target_package = strdup(package_name);
@@ -169,21 +184,19 @@ extern "C" void ainject(const char* package_name, const char* so_path) {
     if (so_path != nullptr && so_path[0] != '\0') {
         g_target_so = strdup(so_path);
     }
-    g_payload_loaded = false;
 
     LOGI("ncore: ainject package=%s so=%s",
          g_target_package != nullptr ? g_target_package : "(null)",
          g_target_so != nullptr ? g_target_so : "(null)");
 
-    static bool hooks_installed = false;
-    if (hooks_installed) {
+    if (g_spawn_hooks_installed) {
         LOGI("ncore: spawn hooks already installed, skip");
         return;
     }
 
     INSTALL_HOOK(fork, fork);
     INSTALL_HOOK(vfork, vfork);
-    hooks_installed = true;
+    g_spawn_hooks_installed = true;
     LOGI("ncore: spawn hooks installed");
 }
 
@@ -191,12 +204,5 @@ __attribute__((destructor()))
 static void ncore_cleanup() {
     LOGD("ncore: cleanup");
     unhook_all();
-    if (g_target_package != nullptr) {
-        free(g_target_package);
-        g_target_package = nullptr;
-    }
-    if (g_target_so != nullptr) {
-        free(g_target_so);
-        g_target_so = nullptr;
-    }
+    unload_target_state();
 }

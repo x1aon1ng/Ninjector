@@ -13,9 +13,7 @@
 #include <sstream>
 #include <string>
 #include <sys/mman.h>
-#include <sys/ptrace.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
 
@@ -217,28 +215,21 @@ uid_t get_uid_from_package(const char* package_name) {
 }
 
 bool stop_process(pid_t pid) {
-    if (ptrace(PTRACE_ATTACH, pid, nullptr, nullptr) != 0) {
-        LOGE("symbi: ptrace attach failed pid=%d errno=%d", pid, errno);
+    if (kill(pid, SIGSTOP) != 0) {
+        LOGE("symbi: SIGSTOP failed pid=%d errno=%d", pid, errno);
         return false;
     }
 
-    int status = 0;
-    if (waitpid(pid, &status, WUNTRACED) < 0) {
-        LOGE("symbi: waitpid after attach failed pid=%d errno=%d", pid, errno);
-        ptrace(PTRACE_DETACH, pid, nullptr, nullptr);
-        return false;
-    }
-
-    LOGI("symbi: stopped pid=%d status=0x%x", pid, status);
+    LOGI("symbi: stopped pid=%d via SIGSTOP", pid);
     return true;
 }
 
 void resume_process(pid_t pid) {
-    if (ptrace(PTRACE_DETACH, pid, nullptr, nullptr) != 0) {
-        LOGE("symbi: ptrace detach failed pid=%d errno=%d", pid, errno);
+    if (kill(pid, SIGCONT) != 0) {
+        LOGE("symbi: SIGCONT failed pid=%d errno=%d", pid, errno);
         return;
     }
-    LOGI("symbi: resumed pid=%d", pid);
+    LOGI("symbi: resumed pid=%d via SIGCONT", pid);
 }
 
 int open_remote_mem(pid_t pid) {
@@ -407,7 +398,7 @@ bool collect_symbi_context(pid_t zygote_pid,
 }
 
 bool write_stub_and_patch_slot(int mem_fd, const SymbiContext& ctx) {
-    char remote_pattern[] = "/mmmmmrack87654321";
+    char remote_pattern[] = "/ningningning123123";
     uintptr_t marker = reinterpret_cast<uintptr_t>(
         memmem(stub_binary, stub_binary_size, remote_pattern, sizeof(remote_pattern)));
     if (marker == 0) {
@@ -566,3 +557,4 @@ bool inject_spawn_symbi_by_package(pid_t zygote_pid,
                                    const char* so_path) {
     return inject_spawn_symbi_by_pids(std::vector<pid_t>{zygote_pid}, package_name, so_path);
 }
+

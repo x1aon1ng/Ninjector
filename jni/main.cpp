@@ -88,6 +88,12 @@ static std::vector<pid_t> collect_spawn_source_pids() {
 }
 
 static void show_help(const char* name) {
+    printf("Usage:\n");
+    printf("  %s -P <pid> <so_path>\n", name);
+    printf("  %s -f -p <package> <so_path>\n", name);
+    printf("  %s --spawn-symbi -p <package> <so_path>\n", name);
+    printf("  %s -h\n", name);
+
     LOGI("Usage:");
     LOGI("  %s -P <pid> <so_path>", name);
     LOGI("  %s -f -p <package> <so_path>", name);
@@ -174,6 +180,11 @@ int main(int argc, char* argv[]) {
         int callback_pid = future.get();
         if (callback_pid > 0) {
             LOGI("main: spawn inject success child_pid=%d", callback_pid);
+            if (!clear_spawn_in_zygote(pid, ncore_path.c_str())) {
+                LOGE("main: spawn clear failed");
+            } else {
+                LOGI("main: spawn clear success");
+            }
         } else {
             LOGE("main: spawn callback timeout or failed");
             return -1;
@@ -216,3 +227,5 @@ int main(int argc, char* argv[]) {
     LOGI("main: inject success");
     return 0;
 }
+
+

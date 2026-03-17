@@ -220,3 +220,73 @@ fail:
     }
     return false;
 }
+
+bool clear_spawn_in_zygote(pid_t zygote_pid, const char* ncore_path) {
+    if (zygote_pid <= 0 || ncore_path == nullptr || ncore_path[0] == '\0') {
+        LOGE("clear_spawn_in_zygote: invalid args");
+        return false;
+    }
+
+    bool attached = false;
+    void* handle = nullptr;
+    void* remote_sym_name = nullptr;
+    void* remote_aclear = nullptr;
+
+    handle = inject_so_handle_by_pid(zygote_pid, ncore_path);
+    if (handle == nullptr) {
+        LOGE("clear_spawn_in_zygote: inject ncore failed");
+        return false;
+    }
+
+    if (!attach_process(zygote_pid)) {
+        LOGE("clear_spawn_in_zygote: re-attach zygote failed");
+        return false;
+    }
+    attached = true;
+
+    remote_sym_name = remote_alloc_string(zygote_pid, "aclear");
+    if (remote_sym_name == nullptr) {
+        LOGE("clear_spawn_in_zygote: alloc sym name failed");
+        goto fail;
+    }
+
+    remote_aclear = call_remote_function<void*, void*, const char*>(
+        zygote_pid,
+        reinterpret_cast<void*>(dlsym),
+        handle,
+        reinterpret_cast<const char*>(remote_sym_name)
+    );
+    if (remote_aclear == nullptr) {
+        LOGE("clear_spawn_in_zygote: dlsym(aclear) failed");
+        goto fail;
+    }
+
+    call_remote_call<void>(zygote_pid, reinterpret_cast<long>(remote_aclear), 0, nullptr);
+
+    call_remote_function<void, void*>(
+        zygote_pid,
+        reinterpret_cast<void*>(free),
+        remote_sym_name
+    );
+
+    if (!detach_process(zygote_pid)) {
+        LOGE("clear_spawn_in_zygote: detach failed");
+        return false;
+    }
+
+    LOGI("clear_spawn_in_zygote: ncore cleared in zygote pid=%d", zygote_pid);
+    return true;
+
+fail:
+    if (remote_sym_name != nullptr) {
+        call_remote_function<void, void*>(
+            zygote_pid,
+            reinterpret_cast<void*>(free),
+            remote_sym_name
+        );
+    }
+    if (attached) {
+        detach_process(zygote_pid);
+    }
+    return false;
+}

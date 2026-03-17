@@ -3,7 +3,7 @@
 #include "stub.h"
 
 static volatile TStub stubApi = {
-    .mark = "/mmmmmrack87654321",
+    .mark = "/ningningning123123",
 };
 
 __attribute__((section(".text.entrypoint")))
